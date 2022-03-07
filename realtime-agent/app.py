@@ -29,13 +29,11 @@ def get_state(parameters, t, window_size = 20):
         block = (
             parameter[d : t + 1]
             if d >= 0
-            else -d * [parameter[0]] + parameter[0 : t + 1]
+            else -d * [parameter[0]] + parameter[: t + 1]
         )
-        res = []
-        for i in range(window_size - 1):
-            res.append(block[i + 1] - block[i])
-        for i in range(1, window_size, 1):
-            res.append(block[i] - block[0])
+
+        res = [block[i + 1] - block[i] for i in range(window_size - 1)]
+        res.extend(block[i] - block[0] for i in range(1, window_size))
         outside.append(res)
     return np.array(outside).reshape((1, -1))
 
@@ -68,10 +66,8 @@ class Deep_Evolution_Strategy:
         for i in range(epoch):
             population = []
             rewards = np.zeros(self.population_size)
-            for k in range(self.population_size):
-                x = []
-                for w in self.weights:
-                    x.append(np.random.randn(*w.shape))
+            for _ in range(self.population_size):
+                x = [np.random.randn(*w.shape) for w in self.weights]
                 population.append(x)
             for k in range(self.population_size):
                 weights_population = self._get_weight_from_population(
@@ -107,8 +103,7 @@ class Model:
 
     def predict(self, inputs):
         feed = np.dot(inputs, self.weights[0]) + self.weights[-2]
-        decision = np.dot(feed, self.weights[1]) + self.weights[-1]
-        return decision
+        return np.dot(feed, self.weights[1]) + self.weights[-1]
 
     def get_weights(self):
         return self.weights
@@ -241,16 +236,12 @@ class Agent:
     def get_state(self, t, inventory, capital, timeseries):
         state = get_state(timeseries, t)
         len_inventory = len(inventory)
-        if len_inventory:
-            mean_inventory = np.mean(inventory)
-        else:
-            mean_inventory = 0
+        mean_inventory = np.mean(inventory) if len_inventory else 0
         z_inventory = (mean_inventory - self._mean) / self._std
         z_capital = (capital - self._mean) / self._std
-        concat_parameters = np.concatenate(
+        return np.concatenate(
             [state, [[len_inventory, z_inventory, z_capital]]], axis = 1
         )
-        return concat_parameters
 
     def get_reward(self, weights):
         initial_money = self._scaled_capital
